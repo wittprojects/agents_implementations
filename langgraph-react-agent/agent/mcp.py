@@ -36,9 +36,45 @@ import logging
 from pathlib import Path
 from typing import List
 
-from langchain_core.tools import BaseTool
+from langchain_core.tools import BaseTool, StructuredTool
 
 logger = logging.getLogger(__name__)
+
+
+def _as_text(result) -> str:
+    """Flatten an MCP tool result (which may be a list of structured content blocks)
+    to plain text."""
+    if isinstance(result, str):
+        return result
+    if isinstance(result, list):
+        parts = []
+        for block in result:
+            if isinstance(block, dict):
+                parts.append(block.get("text") or json.dumps(block, default=str))
+            else:
+                parts.append(getattr(block, "text", None) or str(block))
+        return "\n".join(parts)
+    return str(result)
+
+
+def _text_only(tool: BaseTool) -> BaseTool:
+    """Wrap an MCP tool so its result is a plain-text string.
+
+    MCP servers can return structured content blocks (each carrying an ``id`` /
+    annotations). Some chat APIs (e.g. Claude via Databricks serving) reject those
+    extra fields inside a tool_result block ("Extra inputs are not permitted"), so we
+    normalize the output to text before it re-enters the model conversation.
+    """
+
+    async def _arun(**kwargs):
+        return _as_text(await tool.ainvoke(kwargs))
+
+    return StructuredTool.from_function(
+        coroutine=_arun,
+        name=tool.name,
+        description=tool.description,
+        args_schema=tool.args_schema,
+    )
 
 
 def _load_config(config_path: Path) -> dict:
@@ -95,7 +131,7 @@ async def load_mcp_tools(config_path, *, bearer_token: str | None = None) -> Lis
         try:
             client = MultiServerMCPClient({name: _prepare(cfg, bearer_token)})
             server_tools = await client.get_tools()
-            tools.extend(server_tools)
+            tools.extend(_text_only(t) for t in server_tools)
             logger.info("loaded %d tool(s) from MCP server '%s'", len(server_tools), name)
         except Exception:
             logger.exception("failed to load MCP server '%s'; skipping", name)
