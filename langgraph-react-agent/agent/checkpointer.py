@@ -9,6 +9,7 @@ process restarts because it lives in Postgres.
 from __future__ import annotations
 
 import logging
+import re
 
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg.rows import dict_row
@@ -18,6 +19,12 @@ from .config import Settings
 from .lakebase import OAuthAsyncConnection
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_identifier(name: str) -> None:
+    # Schema name is interpolated into DDL; keep it a safe SQL identifier.
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
+        raise ValueError(f"invalid schema identifier: {name!r}")
 
 
 def _conninfo(settings: Settings) -> str:
@@ -36,11 +43,20 @@ async def build_checkpointer(settings: Settings) -> tuple[AsyncPostgresSaver, As
     The caller must have seeded the Lakebase token manager first, and is
     responsible for closing the returned pool on shutdown.
     """
+    schema = settings.pg_schema
+    _validate_identifier(schema)
     pool = AsyncConnectionPool(
         conninfo=_conninfo(settings),
         connection_class=OAuthAsyncConnection,
-        # These kwargs are REQUIRED by the LangGraph Postgres checkpointer.
-        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+        # These kwargs are REQUIRED by the LangGraph Postgres checkpointer. `options`
+        # points every connection's search_path at our owned schema so the
+        # checkpointer's unqualified DDL lands there (not the locked-down public).
+        kwargs={
+            "autocommit": True,
+            "prepare_threshold": 0,
+            "row_factory": dict_row,
+            "options": f"-c search_path={schema}",
+        },
         min_size=1,
         max_size=10,
         # Recycle connections before the ~1h token TTL so replacements re-auth with
@@ -49,9 +65,13 @@ async def build_checkpointer(settings: Settings) -> tuple[AsyncPostgresSaver, As
         open=False,
     )
     await pool.open(wait=True)
+    # The app's role owns this schema (it has database-level CREATE), so it can
+    # create the checkpoint tables here even though it lacks CREATE on public.
+    async with pool.connection() as conn:
+        await conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
     saver = AsyncPostgresSaver(pool)
     await saver.setup()  # idempotent; creates checkpoint tables + runs migrations
-    logger.info("Lakebase checkpointer initialized (pool open, tables ready)")
+    logger.info("Lakebase checkpointer initialized (schema=%s, tables ready)", schema)
     return saver, pool
 
 

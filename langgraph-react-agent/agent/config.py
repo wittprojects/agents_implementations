@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     pg_user: str | None = Field(default=None, alias="PGUSER")
     pg_database: str = Field(default="databricks_postgres", alias="PGDATABASE")
     pg_sslmode: str = Field(default="require", alias="PGSSLMODE")
+    # Dedicated schema for checkpoint tables. The app's role owns it (it has
+    # database-level CREATE), avoiding the "permission denied for schema public"
+    # that Postgres 15+ raises for non-owner roles.
+    pg_schema: str = Field(default="langgraph", alias="PGSCHEMA")
 
     # --- Auth / environment ---
     databricks_profile: str | None = Field(default=None, alias="DATABRICKS_PROFILE")

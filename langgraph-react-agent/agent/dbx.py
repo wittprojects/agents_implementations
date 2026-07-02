@@ -38,6 +38,24 @@ def get_workspace_client(settings: Settings) -> WorkspaceClient:
     return WorkspaceClient()
 
 
+def resolve_lakebase_host(ws: WorkspaceClient, endpoint_path: str) -> str | None:
+    """Resolve the Postgres host for a Lakebase endpoint path.
+
+    Attaching a Lakebase (autoscaling) `postgres` resource to the app provisions the
+    service principal's Postgres role but does not inject PGHOST. Given
+    LAKEBASE_ENDPOINT (``projects/<p>/branches/<b>/endpoints/<e>``), we look the host
+    up from the endpoint's status so deployments only need to set LAKEBASE_ENDPOINT.
+    """
+    try:
+        resp = ws.api_client.do("GET", f"/api/2.0/postgres/{endpoint_path}")
+        status = (resp or {}).get("status", {}) or {}
+        hosts = status.get("hosts") or {}
+        return hosts.get("host") or status.get("host")
+    except Exception:
+        logger.warning("could not resolve Lakebase host for %s", endpoint_path, exc_info=True)
+        return None
+
+
 def bearer_token(ws: WorkspaceClient) -> str | None:
     """Best-effort extraction of the current bearer token (used to authenticate to
     Databricks-hosted MCP servers). Returns None if it cannot be obtained."""

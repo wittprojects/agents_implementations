@@ -1,13 +1,23 @@
 # Databricks App runtime configuration.
 #
-# The attached Lakebase Database resource auto-injects PGHOST / PGUSER / PGDATABASE
-# / PGPORT / PGSSLMODE (and, on Autoscaling, LAKEBASE_ENDPOINT). Do NOT also set
-# those here or the static value may shadow the injected one. If LAKEBASE_ENDPOINT
-# is not auto-injected in your workspace, add it here (or via `databricks apps`
-# env) after provisioning.
+# Lakebase wiring: attach a `postgres` app resource (permission CAN_CONNECT_AND_CREATE)
+# — this provisions the app service principal's Postgres role. Then set
+# LAKEBASE_ENDPOINT below to your endpoint path. At startup the app resolves PGHOST
+# from that endpoint, and PGUSER falls back to the injected DATABRICKS_CLIENT_ID (which
+# equals the provisioned Postgres role). PGDATABASE/PGPORT/PGSSLMODE are universal.
+#
+# When forking, replace LAKEBASE_ENDPOINT with your own project/branch/endpoint.
 command:
   - "python"
   - "app.py"
 env:
   - name: LLM_ENDPOINT
     value: databricks-claude-sonnet-4-5
+  - name: LAKEBASE_ENDPOINT
+    value: projects/langgraph-react-agent/branches/production/endpoints/primary
+  - name: PGDATABASE
+    value: databricks_postgres
+  - name: PGPORT
+    value: "5432"
+  - name: PGSSLMODE
+    value: require

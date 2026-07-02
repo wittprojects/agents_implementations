@@ -24,7 +24,7 @@ from pydantic import BaseModel
 
 from agent.checkpointer import build_checkpointer, memory_checkpointer
 from agent.config import Settings
-from agent.dbx import bearer_token, configure_auth, get_workspace_client
+from agent.dbx import bearer_token, configure_auth, get_workspace_client, resolve_lakebase_host
 from agent.graph import build_agent
 from agent.lakebase import init_token_manager
 from agent.mcp import load_mcp_tools
@@ -61,6 +61,11 @@ async def lifespan(app: FastAPI):
     ws = get_workspace_client(settings)
     mcp_tools = await load_mcp_tools(settings.mcp_config_path, bearer_token=bearer_token(ws))
     logger.info("loaded %d MCP tool(s)", len(mcp_tools))
+
+    # If the host wasn't injected, resolve it from the Lakebase endpoint path.
+    if settings.lakebase_endpoint and not settings.pg_host:
+        settings.pg_host = await asyncio.to_thread(resolve_lakebase_host, ws, settings.lakebase_endpoint)
+        logger.info("resolved Lakebase host: %s", settings.pg_host)
 
     if settings.lakebase_configured:
         tm = init_token_manager(ws, settings.lakebase_endpoint, settings.token_refresh_interval_s)

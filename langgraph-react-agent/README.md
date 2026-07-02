@@ -126,8 +126,8 @@ its binary present in the App container. Unreachable servers are logged and skip
 
 1. **Provision Lakebase (Autoscaling):** create a Postgres project + branch; note the
    endpoint path for `LAKEBASE_ENDPOINT`.
-2. **Deploy the code:** `databricks bundle deploy -t fevm -p FEVM` (or `databricks sync`
-   + `databricks apps deploy`).
+2. **Deploy the code:** `databricks bundle deploy -t fevm -p fevm` (or `databricks sync`
+   + `databricks apps deploy`; profile names are case-sensitive).
 3. **Attach resources** to the app: the **Lakebase Database** (auto-injects `PG*` and
    auto-creates the service-principal Postgres role) and the **Model Serving endpoint**
    (`databricks-claude-sonnet-4-5`, CAN QUERY). **Redeploy** so the env vars are injected.
