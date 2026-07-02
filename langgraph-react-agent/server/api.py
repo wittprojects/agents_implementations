@@ -3,6 +3,7 @@
 Wires the agent together on startup (skills → MCP tools → Lakebase checkpointer →
 agent) and exposes:
 
+- ``GET  /``                           minimal streaming chat UI (static/index.html)
 - ``GET  /health``                     liveness + checkpointer status
 - ``POST /chat``                       streamed (SSE) chat, state keyed by thread_id
 - ``GET  /threads/{thread_id}/state``  inspect a conversation's persisted messages
@@ -17,9 +18,11 @@ import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from langchain_core.messages import AIMessage
 from pydantic import BaseModel
 
 from agent.checkpointer import build_checkpointer, memory_checkpointer
@@ -94,6 +97,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="LangGraph ReAct Agent — Lakebase + skills", lifespan=lifespan)
 
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+
+
+@app.get("/")
+async def index():
+    return FileResponse(STATIC_DIR / "index.html")
+
 
 @app.get("/health")
 async def health():
@@ -109,13 +119,40 @@ async def health():
     return {"status": "ok" if state.agent is not None else "starting", "checkpointer": checkpointer}
 
 
+def _sse(obj: dict) -> str:
+    return f"data: {json.dumps(obj)}\n\n"
+
+
+def _text(content) -> str:
+    """Extract plain text from a message chunk's content (str or content-block list)."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            part.get("text", "") for part in content if isinstance(part, dict) and part.get("type") == "text"
+        )
+    return ""
+
+
 async def _stream(thread_id: str, message: str):
+    """Stream typed SSE events: {"type":"token","content":...} for assistant text and
+    {"type":"tool","name":...} when the agent calls a tool. Tool *outputs* (e.g. the
+    load_skill instructions) are intentionally not streamed to the chat."""
     config = {"configurable": {"thread_id": thread_id}}
     inputs = {"messages": [{"role": "user", "content": message}]}
-    async for chunk, _meta in state.agent.astream(inputs, config, stream_mode="messages"):
-        content = getattr(chunk, "content", "")
-        if content:
-            yield f"data: {json.dumps({'content': content})}\n\n"
+    try:
+        async for chunk, _meta in state.agent.astream(inputs, config, stream_mode="messages"):
+            if not isinstance(chunk, AIMessage):
+                continue  # skip tool/human/system messages (AIMessageChunk is an AIMessage)
+            for tc in getattr(chunk, "tool_call_chunks", None) or []:
+                if tc.get("name"):
+                    yield _sse({"type": "tool", "name": tc["name"]})
+            text = _text(chunk.content)
+            if text:
+                yield _sse({"type": "token", "content": text})
+    except Exception as exc:  # surface errors to the UI instead of a silent hang
+        logger.exception("error while streaming chat")
+        yield _sse({"type": "error", "message": str(exc)})
     yield "data: [DONE]\n\n"
 
 
