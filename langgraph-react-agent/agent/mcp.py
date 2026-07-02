@@ -68,8 +68,18 @@ def _prepare(cfg: dict, bearer_token: str | None) -> dict:
     return cfg
 
 
-async def load_mcp_tools(config_path: str | Path, *, bearer_token: str | None = None) -> List[BaseTool]:
-    servers = _load_config(Path(config_path))
+def _merge_configs(paths) -> dict:
+    """Merge enabled servers from several config files; later files win on name."""
+    merged: dict = {}
+    for p in paths:
+        merged.update(_load_config(Path(p)))
+    return merged
+
+
+async def load_mcp_tools(config_path, *, bearer_token: str | None = None) -> List[BaseTool]:
+    # Accept a single path or a list of paths (base config + optional local override).
+    paths = config_path if isinstance(config_path, (list, tuple)) else [config_path]
+    servers = _merge_configs(paths)
     if not servers:
         return []
 

@@ -10,6 +10,7 @@ skill before running its workflow.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import List
 
 from langchain.agents import create_agent
@@ -22,7 +23,12 @@ from .tools import BUILTIN_TOOLS
 
 logger = logging.getLogger(__name__)
 
-BASE_SYSTEM_PROMPT = """You are a helpful, capable general-purpose assistant that uses tools to accomplish tasks.
+# Generic base persona. A deployment can replace this with its own domain persona
+# via a local `system_prompt.local.md` (see Settings.system_prompt_file); the skills
+# section below is always appended regardless.
+BASE_INSTRUCTIONS = "You are a helpful, capable general-purpose assistant that uses tools to accomplish tasks."
+
+SKILLS_SECTION = """
 
 You have access to a set of SKILLS — specialized workflows, each with detailed instructions:
 
@@ -30,8 +36,15 @@ You have access to a set of SKILLS — specialized workflows, each with detailed
 
 When a user's request matches one of these skills, FIRST call `load_skill(skill_name)` to read its full
 instructions, then follow them step by step using the available tools. If no skill applies, respond
-directly or use your other tools. Think step by step and be concise.
-"""
+directly or use your other tools. Think step by step and be concise."""
+
+
+def _base_instructions(settings: Settings) -> str:
+    path = Path(settings.system_prompt_file)
+    if path.exists():
+        logger.info("using local system prompt override: %s", path)
+        return path.read_text().strip()
+    return BASE_INSTRUCTIONS
 
 
 def assemble_tools(registry: SkillRegistry, mcp_tools: List[BaseTool]) -> List[BaseTool]:
@@ -47,7 +60,7 @@ def assemble_tools(registry: SkillRegistry, mcp_tools: List[BaseTool]) -> List[B
 def build_agent(settings: Settings, checkpointer, registry: SkillRegistry, mcp_tools: List[BaseTool]):
     llm = build_llm(settings)
     tools = assemble_tools(registry, mcp_tools)
-    system_prompt = BASE_SYSTEM_PROMPT.format(skill_catalog=registry.render_catalog())
+    system_prompt = _base_instructions(settings) + SKILLS_SECTION.format(skill_catalog=registry.render_catalog())
     logger.info("building agent with %d tools", len(tools))
     return create_agent(
         model=llm,

@@ -91,6 +91,19 @@ class SkillRegistry:
                 logger.exception("failed to load skill at %s; skipping", skill_md.parent)
         return cls(skills)
 
+    @classmethod
+    def load_dirs(cls, dirs) -> "SkillRegistry":
+        """Load and merge skills from several directories. Later dirs win on name
+        conflict (so a local dir can override a shipped skill). Missing dirs are
+        skipped quietly."""
+        merged: dict[str, Skill] = {}
+        for d in dirs:
+            if not Path(d).exists():
+                continue
+            for skill in cls.load(d).skills:
+                merged[skill.name] = skill
+        return cls(list(merged.values()))
+
     @property
     def skills(self) -> List[Skill]:
         return list(self._skills.values())

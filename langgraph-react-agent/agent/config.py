@@ -47,6 +47,14 @@ class Settings(BaseSettings):
     skills_dir: str = Field(default="skills", alias="SKILLS_DIR")
     mcp_config_path: str = Field(default="mcp_servers.json", alias="MCP_CONFIG_PATH")
 
+    # Optional deployment-specific overrides, layered on top of the committed
+    # defaults above. Intended to be gitignored so a deployment can specialize the
+    # agent (extra skills, real MCP servers, a domain system prompt) without
+    # touching the shared scaffold. All are no-ops when the file/dir is absent.
+    local_skills_dir: str = Field(default="skills_local", alias="LOCAL_SKILLS_DIR")
+    local_mcp_config_path: str = Field(default="mcp_servers.local.json", alias="LOCAL_MCP_CONFIG_PATH")
+    system_prompt_file: str = Field(default="system_prompt.local.md", alias="SYSTEM_PROMPT_FILE")
+
     @property
     def is_deployed(self) -> bool:
         """True when running inside a Databricks App (name is injected by the runtime)."""

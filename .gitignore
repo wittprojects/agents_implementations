@@ -14,6 +14,12 @@ env/
 .env
 *.local
 
+# Deployment-specific local overrides (layered on top of the committed scaffold,
+# never committed): local skills, local MCP servers, and a local system prompt.
+skills_local/
+*.local.json
+system_prompt.local.md
+
 # Databricks
 .databricks/
 .databricks-login.json

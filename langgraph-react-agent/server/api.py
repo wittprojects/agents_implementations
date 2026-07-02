@@ -58,11 +58,15 @@ async def lifespan(app: FastAPI):
     state.settings = settings
     configure_auth(settings)
 
-    registry = SkillRegistry.load(settings.skills_dir)
+    # Skills: committed skills/ + optional local override dir (local wins on name).
+    registry = SkillRegistry.load_dirs([settings.skills_dir, settings.local_skills_dir])
     logger.info("loaded %d skill(s): %s", len(registry.skills), [s.name for s in registry.skills])
 
     ws = get_workspace_client(settings)
-    mcp_tools = await load_mcp_tools(settings.mcp_config_path, bearer_token=bearer_token(ws))
+    # MCP: committed mcp_servers.json + optional local override (local wins on name).
+    mcp_tools = await load_mcp_tools(
+        [settings.mcp_config_path, settings.local_mcp_config_path], bearer_token=bearer_token(ws)
+    )
     logger.info("loaded %d MCP tool(s)", len(mcp_tools))
 
     # If the host wasn't injected, resolve it from the Lakebase endpoint path.

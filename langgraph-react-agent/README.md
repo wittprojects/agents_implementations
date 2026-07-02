@@ -122,6 +122,22 @@ Add an entry to `mcp_servers.json`:
 the service principal). HTTP transports are the deployable default; a `stdio` server needs
 its binary present in the App container. Unreachable servers are logged and skipped.
 
+## Deployment-specific overrides (local, not committed)
+
+To specialize a deployment without touching the shared scaffold, drop any of these
+**gitignored** local files alongside the committed ones. Each is optional and layered on
+top of the committed defaults (local wins), so the public scaffold behaves identically when
+they're absent:
+
+| Local file/dir | Overrides | Effect |
+|---|---|---|
+| `skills_local/<name>/SKILL.md` | `skills/` | Adds deployment-specific skills (merged; local wins on name) |
+| `mcp_servers.local.json` | `mcp_servers.json` | Adds/overrides MCP servers (same schema) |
+| `system_prompt.local.md` | base persona | Replaces the base system instructions (the skill catalog is still appended) |
+
+Because these are gitignored, `databricks sync` skips them — deliver them to a deployed app
+with an explicit `databricks workspace import` / `import-dir` into the app's source path.
+
 ## Deploy to Databricks Apps (FEVM)
 
 1. **Provision Lakebase (Autoscaling):** create a Postgres project + branch; note the

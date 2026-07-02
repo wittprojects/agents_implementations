@@ -2,7 +2,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from agent.mcp import _load_config, _prepare, load_mcp_tools
+from agent.mcp import _load_config, _merge_configs, _prepare, load_mcp_tools
 
 
 def test_missing_config_returns_empty(tmp_path):
@@ -47,3 +47,24 @@ def test_shipped_config_parses(tmp_path):
     # The repo's example config ships with only disabled/commented servers.
     shipped = Path(__file__).resolve().parents[1] / "mcp_servers.json"
     assert _load_config(shipped) == {}
+
+
+def test_merge_configs_local_wins(tmp_path):
+    base = tmp_path / "mcp_servers.json"
+    base.write_text(json.dumps({"mcpServers": {
+        "a": {"transport": "stdio", "command": "x"},
+        "b": {"transport": "stdio", "command": "y"},
+    }}))
+    local = tmp_path / "mcp_servers.local.json"
+    local.write_text(json.dumps({"mcpServers": {
+        "b": {"transport": "streamable_http", "url": "https://z"},
+        "c": {"transport": "stdio", "command": "w"},
+    }}))
+    merged = _merge_configs([base, local, tmp_path / "missing.json"])
+    assert set(merged) == {"a", "b", "c"}
+    assert merged["b"]["transport"] == "streamable_http"  # local overrides base
+
+
+def test_load_mcp_tools_accepts_list(tmp_path):
+    # A list of (all missing) configs yields no tools and contacts nothing.
+    assert asyncio.run(load_mcp_tools([tmp_path / "none1.json", tmp_path / "none2.json"])) == []
