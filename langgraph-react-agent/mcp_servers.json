@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "//_example_http": {
+      "transport": "streamable_http",
+      "url": "https://<workspace-host>/api/2.0/mcp/functions/<catalog>/<schema>",
+      "auth": "databricks",
+      "disabled": true
+    },
+    "//_example_stdio": {
+      "transport": "stdio",
+      "command": "python",
+      "args": ["-m", "my_mcp_server"],
+      "disabled": true
+    }
+  }
+}

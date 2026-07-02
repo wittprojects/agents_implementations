@@ -1,0 +1,13 @@
+# Databricks App runtime configuration.
+#
+# The attached Lakebase Database resource auto-injects PGHOST / PGUSER / PGDATABASE
+# / PGPORT / PGSSLMODE (and, on Autoscaling, LAKEBASE_ENDPOINT). Do NOT also set
+# those here or the static value may shadow the injected one. If LAKEBASE_ENDPOINT
+# is not auto-injected in your workspace, add it here (or via `databricks apps`
+# env) after provisioning.
+command:
+  - "python"
+  - "app.py"
+env:
+  - name: LLM_ENDPOINT
+    value: databricks-claude-sonnet-4-5

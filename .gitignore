@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Local config / secrets
+.env
+*.local
+
+# Databricks
+.databricks/
+.databricks-login.json
+
+# OS / editor
+.DS_Store
+
+# Claude Code / harness session artifacts
+.claude/

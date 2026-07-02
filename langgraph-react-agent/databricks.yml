@@ -1,0 +1,34 @@
+# Databricks Asset Bundle for deploying this agent as a Databricks App.
+#
+# Deploy (FEVM profile):
+#   databricks bundle deploy -t fevm -p FEVM
+#
+# The Lakebase Database resource and the Model Serving endpoint resource are best
+# attached to the app after first deploy (via the Apps UI or `databricks apps`),
+# because binding a Lakebase Autoscaling database in a bundle is version-sensitive
+# (see the README + genie-api-cache-queue/docs/dab_chicken_egg_findings.md). Once
+# attached, redeploy so the injected PG*/serving env vars take effect.
+bundle:
+  name: langgraph-react-agent
+
+targets:
+  fevm:
+    mode: development
+    default: true
+
+resources:
+  apps:
+    langgraph_react_agent:
+      name: langgraph-react-agent
+      description: "Generalist LangGraph ReAct agent with Lakebase state + skills + MCP"
+      source_code_path: ./
+      # Attach resources after first deploy (see header note). Intended shape:
+      # resources:
+      #   - name: agent-db
+      #     database:
+      #       database_name: databricks_postgres
+      #       permission: CAN_CONNECT_AND_CREATE
+      #   - name: agent-llm
+      #     serving_endpoint:
+      #       name: databricks-claude-sonnet-4-5
+      #       permission: CAN_QUERY

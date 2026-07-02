@@ -1,0 +1,24 @@
+# Web
+fastapi==0.115.*
+uvicorn[standard]==0.32.*
+pydantic==2.*
+pydantic-settings==2.*
+
+# Databricks
+databricks-sdk>=0.40.0
+databricks-langchain>=0.4.0
+
+# LangGraph / LangChain (create_agent needs langchain 1.x)
+langchain>=1.3,<2
+langgraph>=1.2,<2
+langgraph-checkpoint-postgres>=3.0,<4
+
+# Postgres driver + pool (required by the LangGraph Postgres checkpointer)
+psycopg[binary]>=3.2
+psycopg-pool>=3.2
+
+# MCP toolset adapter
+langchain-mcp-adapters>=0.1
+
+# Skill frontmatter parsing
+pyyaml>=6.0
